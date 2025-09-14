@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 import { initMongoConnection } from "../db/initMongoConnection.js";
-import User from "../models/User.js";
-import Product from "../models/Product.js";
+import User from "../db/models/User.js";
+import Product from "../db/models/Product.js";
 
-import logger from "../utils/logger";
+import logger from "../utils/logger.js";
 import { faker } from "@faker-js/faker";
 
 const seedDatabase = async () => {

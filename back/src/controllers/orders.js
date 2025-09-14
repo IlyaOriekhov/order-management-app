@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 
-import { User } from "../db/models/User.js";
-import { Product } from "../db/models/Product.js";
-import { Order } from "../db/models/Order.js";
+import User from "../db/models/User.js";
+import Product from "../db/models/Product.js";
+import Order from "../db/models/Order.js";
 
 export const createOrderController = async (req, res) => {
   const session = await mongoose.startSession();

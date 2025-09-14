@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import { Schema, model, Types } from "mongoose";
 
 const orderSchema = new Schema(
   {
@@ -17,7 +17,7 @@ const orderSchema = new Schema(
       required: true,
     },
     totalPrice: {
-      type: Schema.Types.Decimal128,
+      type: Types.Decimal128,
       required: true,
     },
   },
@@ -27,4 +27,13 @@ const orderSchema = new Schema(
   }
 );
 
-export const Order = model("Order", orderSchema);
+orderSchema.set("toJSON", {
+  transform: (doc, ret) => {
+    if (ret.totalPrice) {
+      ret.totalPrice = ret.totalPrice.toString();
+    }
+    return ret;
+  },
+});
+
+export default model("Order", orderSchema);
