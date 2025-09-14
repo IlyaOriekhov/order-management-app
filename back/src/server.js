@@ -4,13 +4,25 @@ import { env } from "./utils/env.js";
 
 import orderRouter from "./routers/orders.js";
 
+import { apiLimiter } from "./middleware/rateLimiter.js";
+import logger from "./utils/logger.js";
+
 export const startServer = () => {
   const app = express();
+
+  app.use(apiLimiter);
 
   app.use(express.json());
   app.use(cors());
 
   app.use(orderRouter);
+
+  app.use((err, req, res, next) => {
+    logger.error(err.message);
+    res.status(500).json({
+      message: "Something went wrong",
+    });
+  });
 
   app.use((req, res) => {
     res.status(404).json({ message: "Not found" });
