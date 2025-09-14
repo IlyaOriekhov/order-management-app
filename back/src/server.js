@@ -1,14 +1,18 @@
 import express from "express";
 import cors from "cors";
-import { env } from "./utils/env";
+import { env } from "./utils/env.js";
+
+import orderRouter from "./routers/orders.js";
 
 export const startServer = () => {
-  const app = express;
+  const app = express();
 
   app.use(express.json());
   app.use(cors());
 
-  app.use("*", (req, res) => {
+  app.use(orderRouter);
+
+  app.use((req, res) => {
     res.status(404).json({ message: "Not found" });
   });
 
