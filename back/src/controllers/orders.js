@@ -4,87 +4,100 @@ import User from "../db/models/User.js";
 import Product from "../db/models/Product.js";
 import Order from "../db/models/Order.js";
 
-export const createOrderController = async (req, res) => {
+import logger from "../utils/logger.js";
+
+export const createOrderController = async (req, res, next) => {
+  const { userId, productId, quantity } = req.body;
+
+  if (
+    !mongoose.Types.ObjectId.isValid(userId) ||
+    !mongoose.Types.ObjectId.isValid(productId)
+  ) {
+    return res
+      .status(400)
+      .json({ message: "Invalid User or Product ID format" });
+  }
+  if (!quantity || quantity <= 0) {
+    return res
+      .status(400)
+      .json({ message: "Quantity must be a positive number" });
+  }
+
   const session = await mongoose.startSession();
+  session.startTransaction();
 
   try {
-    session.startTransaction();
-
-    const { userId, productId, quantity } = req.body;
-
-    if (!userId || !productId || !quantity || quantity <= 0) {
-      return res
-        .status(400)
-        .json({ message: "Missing or invalid required fields" });
-    }
-
     const user = await User.findById(userId).session(session);
-    const product = await Product.findById(productId).session(session);
-
     if (!user) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ message: "User not found" });
     }
 
+    const product = await Product.findById(productId).session(session);
     if (!product) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ message: "Product not found" });
     }
 
-    const totalPrice = product.price.toString() * quantity;
+    const priceAsNumber = parseFloat(product.get("price").toString());
+    const userBalanceAsNumber = parseFloat(user.get("balance").toString());
 
-    if (parseFloat(user.balance.toString()) < totalPrice) {
+    const totalPrice = priceAsNumber * quantity;
+
+    if (product.stock < quantity) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ message: "Not enough product in stock" });
+    }
+
+    if (userBalanceAsNumber < totalPrice) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ message: "Insufficient balance" });
     }
-    if (product.stock < quantity) {
-      return res.status(400).json({ message: "Product is out of stock" });
-    }
 
-    user.balance = parseFloat(user.balance.toString()) - totalPrice;
+    user.balance = (userBalanceAsNumber - totalPrice).toString();
     product.stock -= quantity;
+
+    await user.save({ session });
+    await product.save({ session });
 
     const order = new Order({
       userId,
       productId,
       quantity,
-      totalPrice,
+      totalPrice: totalPrice.toString(),
     });
 
-    await user.save({ session });
-    await product.save({ session });
-    await order.save({ session });
+    const createdOrder = await order.save({ session });
 
     await session.commitTransaction();
+    session.endSession();
 
-    res.status(201).json({ message: "Order created successfully", order });
+    logger.info(`Order ${createdOrder._id} created successfully.`);
+    res.status(201).json(createdOrder);
   } catch (error) {
     await session.abortTransaction();
-    console.error(error);
-
-    res
-      .status(500)
-      .json({ message: "Failed to create order", error: error.message });
-  } finally {
     session.endSession();
+    logger.error(`Error creating order: ${error.message}`);
+    next(error);
   }
 };
 
-export const getOrdersByUserController = async (req, res) => {
+export const getOrdersByUserController = async (req, res, next) => {
+  const { userId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: "Invalid user ID format" });
+  }
+
   try {
-    const { userId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: "Invalid user ID format" });
-    }
-
-    const orders = await Order.find({ userId }).populate(
-      "productId",
-      "name price"
-    );
-
+    const orders = await Order.find({ userId }).populate("productId");
     res.status(200).json(orders);
   } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ message: "Failed to retrieve orders", error: error.message });
+    logger.error(`Error fetching orders for user ${userId}: ${error.message}`);
+    next(error);
   }
 };
