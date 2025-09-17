@@ -16,11 +16,11 @@ const seedDatabase = async () => {
     logger.info("Cleared old users and products.");
 
     const users = [];
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 20; i++) {
       users.push({
         name: faker.person.fullName(),
         email: faker.internet.email().toLowerCase(),
-        balance: faker.finance.amount({ min: 100, max: 500, dec: 2 }),
+        balance: faker.finance.amount({ min: 1111, max: 7777, dec: 2 }),
       });
     }
 
@@ -28,10 +28,10 @@ const seedDatabase = async () => {
     logger.info(`Seeded ${users.length} users.`);
 
     const products = [];
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 50; i++) {
       products.push({
         name: faker.commerce.productName(),
-        price: faker.commerce.price({ min: 10, max: 2000, dec: 2 }),
+        price: faker.commerce.price({ min: 10, max: 999, dec: 2 }),
         stock: faker.number.int({ min: 0, max: 100 }),
       });
     }

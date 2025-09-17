@@ -3,6 +3,8 @@ import cors from "cors";
 import { env } from "./utils/env.js";
 
 import orderRouter from "./routers/orders.js";
+import userRouter from "./routers/users.js";
+import productRouter from "./routers/products.js";
 
 import { apiLimiter } from "./middleware/rateLimiter.js";
 import logger from "./utils/logger.js";
@@ -10,12 +12,14 @@ import logger from "./utils/logger.js";
 export const startServer = () => {
   const app = express();
 
-  app.use(apiLimiter);
-
   app.use(express.json());
   app.use(cors());
 
+  app.use(apiLimiter);
+
   app.use(orderRouter);
+  app.use(userRouter);
+  app.use(productRouter);
 
   app.use((err, req, res, next) => {
     logger.error(err.message);
