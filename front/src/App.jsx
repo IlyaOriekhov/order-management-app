@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import apiClient from "./api/axios.js";
 
 import OrderForm from "./components/OrderForm.jsx";
@@ -6,82 +6,93 @@ import OrdersTable from "./components/OrdersTable.jsx";
 
 import "./App.css";
 
+import { Toaster, toast } from "react-hot-toast";
+
 function App() {
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [selectedUser, setSelectedUser] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        setLoading(true);
-
-        const [usersResponse, productsResponse] = await Promise.all([
-          apiClient.get("/users"),
-          apiClient.get("/products"),
-        ]);
-        setUsers(usersResponse.data);
-        setProducts(productsResponse.data);
-        setError("");
-      } catch (err) {
-        setError("Failed to fetch initial data. Make sure the API is running.");
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const fetchData = async () => {
+    try {
+      const [usersResponse, productsResponse] = await Promise.all([
+        apiClient.get("/users"),
+        apiClient.get("/products"),
+      ]);
+      setUsers(usersResponse.data);
+      setProducts(productsResponse.data);
+      if (usersResponse.data.length > 0) {
+        setSelectedUserId(usersResponse.data[0]._id);
       }
-    };
-    fetchInitialData();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedUser) {
-      setOrders([]);
-      return;
-    }
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        const response = await apiClient.get(`/orders/${selectedUser}`);
-        setOrders(response.data);
-        setError("");
-      } catch (err) {
-        setError("Failed to fetch orders.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchOrders();
-  }, [selectedUser]);
-
-  const handleOrderCreated = () => {
-    if (selectedUser) {
-      apiClient.get(`/orders/${selectedUser}`).then((response) => {
-        setOrders(response.data);
-      });
+    } catch (error) {
+      console.error("Failed to fetch initial data:", error);
+      toast.error("Could not load initial data.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const fetchOrders = useCallback(async (userId) => {
+    if (!userId) return;
+    try {
+      const response = await apiClient.get(`/orders/${userId}`);
+      setOrders(response.data);
+    } catch (error) {
+      console.error(`Failed to fetch orders for user ${userId}:`, error);
+      toast.error("Could not load orders.");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (selectedUserId) {
+        fetchOrders(selectedUserId);
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [selectedUserId, fetchOrders]);
+
+  const handleCreateOrder = async (orderData) => {
+    try {
+      await apiClient.post("/orders", orderData);
+      toast.success("Order created successfully!");
+      fetchOrders(selectedUserId);
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message || "An unexpected error occurred.";
+      toast.error(errorMessage);
+    }
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="container">
+      <Toaster position="top-right" reverseOrder={false} />
+
       <h1>Order Management</h1>
-      {error && <p className="error">{error}</p>}
-      {loading && <p>Loading...</p>}
 
       <div className="user-selector">
-        <label htmlFor="user">Select User to see orders:</label>
+        <label htmlFor="user-select">Select User:</label>
         <select
-          id="user"
-          value={selectedUser}
-          onChange={(e) => setSelectedUser(e.target.value)}
+          id="user-select"
+          value={selectedUserId}
+          onChange={(e) => setSelectedUserId(e.target.value)}
         >
-          <option value="">-- Select a User --</option>
           {users.map((user) => (
             <option key={user._id} value={user._id}>
-              {user.name} ({user.email})
+              {user.name} ({user.balance}$)
             </option>
           ))}
         </select>
@@ -89,15 +100,14 @@ function App() {
 
       <div className="main-content">
         <div className="form-container">
-          <h2>Create New Order</h2>
           <OrderForm
             users={users}
             products={products}
-            onOrderCreated={handleOrderCreated}
+            onCreateOrder={handleCreateOrder}
+            selectedUserId={selectedUserId}
           />
         </div>
         <div className="table-container">
-          <h2>User's Orders</h2>
           <OrdersTable orders={orders} />
         </div>
       </div>

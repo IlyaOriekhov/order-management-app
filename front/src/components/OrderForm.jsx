@@ -1,76 +1,53 @@
-import { useState } from "react";
-import apiClient from "../api/axios.js";
+import { useState, useEffect } from "react";
 
-function OrderForm({ users, products, onOrderCreated }) {
-  const [formData, setFormData] = useState({
-    userId: "",
-    productId: "",
-    quantity: 1,
-  });
+import { toast } from "react-hot-toast";
 
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+const OrderForm = ({ products, onCreateOrder, selectedUserId }) => {
+  const [productId, setProductId] = useState("");
+  const [quantity, setQuantity] = useState(1);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  useEffect(() => {
+    if (products.length > 0) {
+      setProductId(products[0]._id);
+    }
+  }, [products]);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
 
-    if (!formData.userId || !formData.productId || formData.quantity <= 0) {
-      setError("Please fill all fields and enter a valid quantity.");
+    if (!selectedUserId || !productId || !quantity) {
+      toast.error("Please select a user, product, and quantity.");
       return;
     }
 
-    try {
-      await apiClient.post("/orders", {
-        ...formData,
-        quantity: Number(formData.quantity),
-      });
-      setSuccess("Order created successfully!");
-      onOrderCreated();
-      setFormData({ userId: "", productId: "", quantity: 1 });
-    } catch (err) {
-      const errorMessage =
-        err.response?.data?.message || "Failed to create order.";
-      setError(errorMessage);
+    if (quantity <= 0) {
+      toast.error("Quantity must be a positive number.");
+      return;
     }
+
+    onCreateOrder({
+      userId: selectedUserId,
+      productId,
+      quantity,
+    });
+
+    setQuantity(1);
   };
 
   return (
     <form onSubmit={handleSubmit} className="order-form">
-      {error && <p className="error">{error}</p>}
-      {success && <p className="success">{success}</p>}
+      <h2>Create New Order</h2>
 
       <div className="form-group">
-        <label htmlFor="userId">User</label>
-        <select name="userId" value={formData.userId} onChange={handleChange}>
-          <option value="">Select User</option>
-          {users.map((user) => (
-            <option key={user._id} value={user._id}>
-              {user.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="form-group">
-        <label htmlFor="productId">Product</label>
+        <label htmlFor="product">Product</label>
         <select
-          name="productId"
-          value={formData.productId}
-          onChange={handleChange}
+          id="product"
+          value={productId}
+          onChange={(e) => setProductId(e.target.value)}
         >
-          <option value="">Select Product</option>
           {products.map((product) => (
             <option key={product._id} value={product._id}>
-              {product.name} - ${product.price} (Stock: {product.stock})
+              {product.name} ({product.price}$) - Stock: {product.stock}
             </option>
           ))}
         </select>
@@ -79,17 +56,17 @@ function OrderForm({ users, products, onOrderCreated }) {
       <div className="form-group">
         <label htmlFor="quantity">Quantity</label>
         <input
+          id="quantity"
           type="number"
-          name="quantity"
-          value={formData.quantity}
-          onChange={handleChange}
+          value={quantity}
+          onChange={(e) => setQuantity(Number(e.target.value))}
           min="1"
         />
       </div>
 
-      <button type="submit">Create Order</button>
+      <button type="submit">Submit Order</button>
     </form>
   );
-}
+};
 
 export default OrderForm;
